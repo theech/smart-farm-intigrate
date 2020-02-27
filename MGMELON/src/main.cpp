@@ -8,7 +8,7 @@
 
 SoftwareSerial mySerial(19, 18); // RX, TX (Arduin Uno)
 
-// what digital pin we're connected to
+// what digital pin we're connected
 #define inDHT 10
 #define outDHT 11
 // Uncomment whatever type you're using!
