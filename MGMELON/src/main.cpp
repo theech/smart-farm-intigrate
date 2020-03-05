@@ -5,8 +5,13 @@
 #include <Keypad.h>
 #include <LiquidCrystal_I2C.h>
 #include <SoftwareSerial.h>
+#include <virtuabotixRTC.h>
 
 SoftwareSerial mySerial(19, 18); // RX, TX (Arduin Uno)
+virtuabotixRTC myRTC(22, 24, 26); // Creation of the Real Time Clock Object
+
+// counting time 
+int time = 0;
 
 // what digital pin we're connected
 #define inDHT 10
@@ -39,11 +44,17 @@ int inHumdStatus = 0;
 int outHumdStatus = 0;
 int inTempStatus = 0;
 int outTempStatus = 0;
+int sumInHumd = 0; // for sumary inHumd very minute
+int sumOutHumd = 0; // for sumary outHumd very minute
+int sumInTemp = 0; // for sumary inHumd very minute
+int sumoutTemp = 0; // for sumary outHumd very minute
 // inLightStaus and outLightStatus are Read value from sensor directly.
 int inLightStatus = 0;
 int outLightStatus = 0;
 int inLightPercent;
 int outLightPercent;
+int sumInLight = 0; //for sumary sumInLight very minute
+int sumOutLight = 0;  //for sumary SumOutLight very minute
 // Standard photoresistor value is 1024 that mean it will start from 0 to 1023
 int lightMin = 0;
 int lightMax = 1023;
@@ -51,6 +62,9 @@ int lightMax = 1023;
 int moisStatus0 = 0;
 int moisStatus1 = 0;
 int moisStatus2 = 0;
+int sumMoisture0 = 0; //for sumary sumMoisture0 very minute
+int sumMoisture1 = 0; //for sumary sumMoisture1 very minute
+int sumMoisture2 = 0; //for sumary sumMoisture2 very minute
 // standart soil moisture
 char standNum[8] = "50";
 // Sending str to Nodemcu
@@ -101,10 +115,26 @@ void setup()
   pinMode(moisPin0, INPUT);
   pinMode(moisPin1, INPUT);
   pinMode(moisPin2, INPUT);
+
+  // Set the current date, and time in the following format:
+  // seconds, minutes, hours, day of the week, day of the month, month, year
+  // myRTC.setDS1302Time(00, 30, 11, 4, 27, 02, 2020);
 }
 
 void loop()
 {
+  // This allows for the update of variables for time or accessing the individual elements.                //|
+  myRTC.updateTime();
+  Serial.println(myRTC.seconds);
+  if (myRTC.seconds == 59) {
+    time += 1;
+    Serial.print(time);
+    Serial.println(" minutes!!");
+    if (time > 10) {
+      time = 0;
+    }
+  }
+
   // keypad setup
   keyPad();
   // humidity and Temperature
@@ -113,12 +143,29 @@ void loop()
   photoresis();
   // soil Moisture
   soilMoisture();
+
+  if (time == 10) {
+    // show in Nodemcu by serial Monitor as realtime
+    comnuni();
+    Serial.println(sumInHumd);
+    Serial.println(sumInTemp);
+
+    sumInHumd = 0; // reset sumary inHumd every minute
+    sumOutHumd = 0; // reset sumary outHumd every minute
+    sumInTemp = 0; // reset sumary inHumd every minute
+    sumoutTemp = 0; // reset sumary outHumd every minute
+    sumInLight = 0; // reset sumary sumInLight every minute
+    sumOutLight = 0;  // reset sumary SumOutLight every minute
+    sumMoisture0 = 0; // reset sumary sumMoisture0 every minute
+    sumMoisture1 = 0; // reset sumary sumMoisture1 every minute
+    sumMoisture2 = 0; // reset sumary sumMoisture2 every minute
+  }
   // show in Nodemcu by serial Monitor as realtime
   comnuni();
   // LCD Disply
   LCDSetup();
   // debuging
-  debug();
+  //debug();
   // Wait a few seconds between measurements.
   //delay(2000);
 }
@@ -165,6 +212,9 @@ void keyPad()
       key = keypad.getKey();
     } while (key != '#');
     lcd.clear();
+    // standard soil number
+    strStandNum = String('Q') + String(standNum);
+    Serial1.println(strStandNum);
   }
 }
 
@@ -178,7 +228,6 @@ void humidTemp()
   // Read temperature as Celsius (the default)
   inTempStatus = dht1.readTemperature();
   outTempStatus = dht2.readTemperature();
-
   // Check if any reads failed and exit early (to try again).
   if (isnan(inHumdStatus) || isnan(inTempStatus))
   {
@@ -189,6 +238,12 @@ void humidTemp()
   {
     Serial.println("Failed to read from Outside DHT22 sensor!");
     return;
+  }
+  if (myRTC.seconds == 59) {
+    sumInHumd += inHumdStatus / time;
+    sumOutHumd += outHumdStatus / time;
+    sumInTemp += inTempStatus / time;
+    sumoutTemp += outTempStatus / time;
   }
 }
 
@@ -211,6 +266,11 @@ void photoresis()
   // calculate to %
   inLightPercent = ((inLightStatus / 1023.0) * 100.0);
   outLightPercent = ((outLightStatus / 1023.0) * 100.0);
+
+  if (myRTC.seconds == 59) {
+    sumInLight += inLightPercent / time;
+    sumOutLight += outLightPercent / time;
+  }
 }
 
 // Soil moisture function
@@ -220,35 +280,38 @@ void soilMoisture()
   moisStatus0 = (analogRead(moisPin0) / 1024.0) * 100.0;
   moisStatus1 = (analogRead(moisPin1) / 1024.0) * 100.0;
   moisStatus2 = (analogRead(moisPin2) / 1024.0) * 100.0;
+
+  if (myRTC.seconds == 59) {
+    sumMoisture0 += moisStatus0 / time;
+    sumMoisture1 += moisStatus1 / time;
+    sumMoisture2 += moisStatus2 / time;
+  }
 }
 
 // Serial Communication function
 void comnuni()
 {
   // in and out dht communication sending string
-  strInH = String('H') + String(inHumdStatus);
-  strInT = String('T') + String(inTempStatus);
-  strOutH = String('I') + String(outHumdStatus);
-  strOutT = String('U') + String(outTempStatus);
+  strInH = String('H') + String(sumInHumd);
+  strInT = String('T') + String(sumInTemp);
+  strOutH = String('I') + String(sumOutHumd);
+  strOutT = String('U') + String(sumoutTemp);
   Serial1.println(strInH);
   Serial1.println(strInT);
   Serial1.println(strOutH);
   Serial1.println(strOutT);
   // in and out light communication sending string
-  strInLig = String('L') + String(inLightPercent);
-  strOutLig = String('M') + String(outLightPercent);
+  strInLig = String('L') + String(sumInLight);
+  strOutLig = String('M') + String(sumOutLight);
   Serial1.println(strInLig);
   Serial1.println(strOutLig);
   // mois 1, 2, and 3 communication sending string
-  strMois0 = String('N') + String(moisStatus0);
-  strMois1 = String('O') + String(moisStatus1);
-  strMois2 = String('P') + String(moisStatus2);
+  strMois0 = String('N') + String(sumMoisture0);
+  strMois1 = String('O') + String(sumMoisture1);
+  strMois2 = String('P') + String(sumMoisture2);
   Serial1.println(strMois0);
   Serial1.println(strMois1);
   Serial1.println(strMois2);
-  // standard soil number
-  strStandNum = String('Q') + String(standNum);
-  Serial1.println(strStandNum);
 }
 
 void LCDSetup()
