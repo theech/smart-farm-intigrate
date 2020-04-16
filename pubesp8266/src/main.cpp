@@ -3,11 +3,6 @@
 #include <PubSubClient.h>
 #include "DHT.h"
 
-// Uncomment one of the lines bellow for whatever DHT sensor type you're using!
-#define DHTTYPE DHT11   // DHT 11
-//#define DHTTYPE DHT21   // DHT 21 (AM2301)
-//#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
-
 // Change the credentials below, so your ESP8266 connects to your router
 const char* ssid = "themakerguy";
 const char* password = "damnuman";
@@ -20,10 +15,14 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 
 // DHT Sensor - GPIO 5 = D1 on ESP-12E NodeMCU board
-const int DHTPin = D3;
+#define INDHT D2
+#define OUTDHT D3
 
-// Initialize DHT sensor.
-DHT dht(DHTPin, DHTTYPE);
+// Initialize DHT sensor. change the line below whatever DHT type you're using DHT11, DHT21 (AM2301), DHT22 (AM2302, AM2321)
+DHT dht[] ={
+  {INDHT, DHT11},
+  {OUTDHT, DHT11}
+};
 
 // Timers auxiliar variables
 unsigned long now = millis();
@@ -80,11 +79,13 @@ void reconnect() {
 // Sets your mqtt broker and sets the callback function
 // The callback function is what receives messages and actually controls the LEDs
 void setup() {
-  dht.begin();
-  
   Serial.begin(115200);
   setup_wifi();
   client.setServer(mqtt_server, 1883);
+
+  for(auto& sensor : dht){
+    sensor.begin();
+  }
 
 }
 
@@ -101,46 +102,56 @@ void loop() {
   // Publishes new temperature and humidity every 30 seconds
   if (now - lastMeasure > 30000) {
     lastMeasure = now;
+    // initialize temperatures and humidities array to store read() values
+    float humidities[2];
+    float temperatures[2];
     // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-    float h = dht.readHumidity();
-    // Read temperature as Celsius (the default)
-    float t = dht.readTemperature();
-    // Read temperature as Fahrenheit (isFahrenheit = true)
-    //float f = dht.readTemperature(true);
-
-    // Check if any reads failed and exit early (to try again).
-    if (isnan(h) || isnan(t)) {
-      Serial.println("Failed to read from DHT sensor!");
-      return;
+    for(int i = 0; i < 2; i++){
+      humidities[i] = dht[i].readHumidity();
+      temperatures[i] = dht[i].readTemperature();
     }
 
+    // Check if any reads failed and exit early (to try again).
+    //   if(isnan(humidities[0]) || isnan(temperatures[0])){
+    //     Serial.println("Failed to read from inside DHT sensor!");
+    //     return;
+    //   } 
+    //   if(isnan(humidities[1]) || isnan(temperatures[1])){
+    //     Serial.println("Failed to read from outside DHT sensor!");
+    //     return;
+    //   }
+
     // Computes temperature values in Celsius
-    //float hic = dht.computeHeatIndex(t, h, false);
-    static char temperatureTemp[7];
-    dtostrf(t, 6, 2, temperatureTemp);
+    static char inTemperature[7];
+    static char outTemperature[7];
+    dtostrf(temperatures[0], 6, 2, inTemperature);
+    dtostrf(temperatures[1], 6, 2, outTemperature);
     
     // Uncomment to compute temperature values in Fahrenheit 
     // float hif = dht.computeHeatIndex(f, h);
     // static char temperatureTemp[7];
     // dtostrf(hic, 6, 2, temperatureTemp);
     
-    static char humidityTemp[7];
-    dtostrf(h, 6, 2, humidityTemp);
+    static char inHumidity[7];
+    static char outHumidity[7];
+    dtostrf(humidities[0], 6, 2, inHumidity);
+    dtostrf(humidities[1], 6, 2, outHumidity);
 
     // Publishes Temperature and Humidity values
-    client.publish("in/temperature", temperatureTemp);
-    client.publish("in/humidity", humidityTemp);
+    client.publish("in/temperature", inTemperature);
+    client.publish("in/humidity", inHumidity);
+    client.publish("out/temperature", outTemperature);
+    client.publish("out/humidity", outHumidity);
     
-    Serial.print("Humidity: ");
-    Serial.print(h);
-    Serial.print(" %\t Temperature: ");
-    Serial.print(t);
+    Serial.print("in Humidity: ");
+    Serial.print(temperatures[0]);
+    Serial.print(" %\t in Temperature: ");
+    Serial.print(humidities[0]);
     Serial.println(" *C ");
-    // Serial.print(f);
-    // Serial.print(" *F\t Heat index: ");
-    // Serial.print(hic);
-    // Serial.println(" *C ");
-    // Serial.print(hif);
-    // Serial.println(" *F");
+    Serial.print("out Humidity: ");
+    Serial.print(temperatures[1]);
+    Serial.print(" %\t out Temperature: ");
+    Serial.print(humidities[1]);
+    Serial.println(" *C ");
   }
 } 
