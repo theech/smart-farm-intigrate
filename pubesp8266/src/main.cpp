@@ -20,8 +20,12 @@ PubSubClient client(espClient);
 // Light Sensor - D0&D1 ESP-12E NodeMCU board
 // TODO: change GPIO TO analog
 #define INTLIGHT D0
-#define OUTLIGHT A0
+#define OUTLIGHT D1
 // Soil moisture sensors - A2&A3&A3 ESP-12E NodeMCU board
+// TODO: change GPIO TO analog
+#define MOISTURE1 D4
+#define MOISTURE2 D5
+#define MOISTURE3 D6
 
 // Initialize DHT sensor. change the line below whatever DHT type you're using DHT11, DHT21 (AM2301), DHT22 (AM2302, AM2321)
 DHT dht[] ={
@@ -31,7 +35,7 @@ DHT dht[] ={
 // Initialize LDR sensor
 float ldrs[] = {INTLIGHT, OUTLIGHT};
 // Initialize Soil moisture sensors sensor
-
+float moistures[] = {MOISTURE1, MOISTURE2, MOISTURE3};
 // Timers auxiliar variables
 unsigned long now = millis();
 unsigned long lastMeasure = 0;
@@ -98,6 +102,11 @@ void setup() {
   for(int i = 0; i < 2; i++){
     pinMode(ldrs[i], INPUT);
   }
+  // MOISTURE sensors setup
+  for(int i = 0; i < 3; i++){
+    pinMode(moistures[i], INPUT);
+  }
+
 }
 
 // For this project, you don't need to change anything in the loop function. Basically it ensures that you ESP is connected to your broker
@@ -126,8 +135,16 @@ void loop() {
     float lSensors[2];
     // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
     for(int i = 0; i < 2; i++){
-      lSensors[i] = analogRead(ldrs[i]);
+      lSensors[i] = digitalRead(ldrs[i]); // TODO: use analogRead() instead
     }
+
+    // initialize MOISTURE sensors array to store read() values
+    float sMoistures[3];
+    // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+    for(int i = 0; i < 3; i++){
+      sMoistures[i] = digitalRead(moistures[i]); // TODO: use analogRead() instead
+    }
+
 
     // Convert float temperatures to string
     static char inTemperature[7];
@@ -146,6 +163,14 @@ void loop() {
     dtostrf(lSensors[0], 6, 2, inlight);
     dtostrf(lSensors[1], 6, 2, outlight);
 
+    // Convert float MOISTURE to string
+    static char moisture1[7];
+    static char moisture2[7];
+    static char moisture3[7];
+    dtostrf(sMoistures[0], 6, 2, moisture1);
+    dtostrf(sMoistures[1], 6, 2, moisture2);
+    dtostrf(sMoistures[2], 6, 2, moisture3);
+
     // Publishes Temperature and Humidity values in string type
     client.publish("in/temperature", inTemperature);
     client.publish("in/humidity", inHumidity);
@@ -155,6 +180,11 @@ void loop() {
     // Publishes LDR values in string type
     client.publish("in/light", inlight);
     client.publish("out/light", outlight);
+
+    // published MOISTURE value in string type
+    client.publish("moisture/one", moisture1);
+    client.publish("moisture/two", moisture2);
+    client.publish("moisture/three", moisture3);
     
     Serial.print("in Humidity: ");
     Serial.print(temperatures[0]);
@@ -171,6 +201,14 @@ void loop() {
     Serial.print(inlight);
     Serial.print(" of 1024\t out Light: ");
     Serial.print(outlight);
+    Serial.println(" of 1024 ");
+    // Moisture sensors
+    Serial.print("moisture 1: ");
+    Serial.print(moisture1);
+    Serial.print(" of 1024\t moisture 2: ");
+    Serial.print(moisture2);
+    Serial.print(" of 1024\t moisture 3: ");
+    Serial.print(moisture3);
     Serial.println(" of 1024 ");
   }
 } 
