@@ -1,36 +1,41 @@
-/*****
- 
- All the resources for this project:
- https://randomnerdtutorials.com/
- 
-*****/
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include "DHT.h"
-
-// Uncomment one of the lines bellow for whatever DHT sensor type you're using!
-#define DHTTYPE DHT11   // DHT 11
-//#define DHTTYPE DHT21   // DHT 21 (AM2301)
-//#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 
 // Change the credentials below, so your ESP8266 connects to your router
 const char* ssid = "themakerguy";
 const char* password = "damnuman";
 
 // Change the variable to your Raspberry Pi IP address, so it connects to your MQTT broker
-const char* mqtt_server = "192.168.43.51";
+const char* mqtt_server = "192.168.43.176";
 
 // Initializes the espClient. You should change the espClient name if you have multiple ESPs running in your home automation system
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-// DHT Sensor - GPIO 5 = D1 on ESP-12E NodeMCU board
-const int DHTPin = 3;
+// DHT Sensor - D2&D3 on ESP-12E NodeMCU board
+#define INDHT D2
+#define OUTDHT D3
+// Light Sensor - D0&D1 ESP-12E NodeMCU board
+// TODO: change GPIO TO analog
+#define INTLIGHT A0
+#define OUTLIGHT D1
+// Soil moisture sensors - A2&A3&A3 ESP-12E NodeMCU board
+// TODO: change GPIO TO analog
+#define MOISTURE1 D4
+#define MOISTURE2 D5
+#define MOISTURE3 D6
 
-// Initialize DHT sensor.
-DHT dht(DHTPin, DHTTYPE);
-
+// Initialize DHT sensor. change the line below whatever DHT type you're using DHT11, DHT21 (AM2301), DHT22 (AM2302, AM2321)
+DHT dht[] ={
+  {INDHT, DHT11},
+  {OUTDHT, DHT11}
+};
+// Initialize LDR sensor
+float ldrs[] = {INTLIGHT, OUTLIGHT};
+// Initialize Soil moisture sensors sensor
+float moistures[] = {MOISTURE1, MOISTURE2, MOISTURE3};
 // Timers auxiliar variables
 unsigned long now = millis();
 unsigned long lastMeasure = 0;
@@ -86,11 +91,21 @@ void reconnect() {
 // Sets your mqtt broker and sets the callback function
 // The callback function is what receives messages and actually controls the LEDs
 void setup() {
-  dht.begin();
-  
   Serial.begin(115200);
   setup_wifi();
   client.setServer(mqtt_server, 1883);
+  // DHTs setup
+  for(auto& sensor : dht){
+    sensor.begin();
+  }
+  // LDRs sensor setup
+  for(int i = 0; i < 2; i++){
+    pinMode(ldrs[i], INPUT);
+  }
+  // MOISTURE sensors setup
+  for(int i = 0; i < 3; i++){
+    pinMode(moistures[i], INPUT);
+  }
 
 }
 
@@ -107,46 +122,93 @@ void loop() {
   // Publishes new temperature and humidity every 30 seconds
   if (now - lastMeasure > 30000) {
     lastMeasure = now;
+    // initialize temperatures and humidities array to store read() values
+    float humidities[2];
+    float temperatures[2];
     // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-    float h = dht.readHumidity();
-    // Read temperature as Celsius (the default)
-    float t = dht.readTemperature();
-    // Read temperature as Fahrenheit (isFahrenheit = true)
-    float f = dht.readTemperature(true);
-
-    // Check if any reads failed and exit early (to try again).
-    if (isnan(h) || isnan(t) || isnan(f)) {
-      Serial.println("Failed to read from DHT sensor!");
-      return;
+    for(int i = 0; i < 2; i++){
+      humidities[i] = dht[i].readHumidity();
+      temperatures[i] = dht[i].readTemperature();
     }
 
-    // Computes temperature values in Celsius
-    float hic = dht.computeHeatIndex(t, h, false);
-    static char temperatureTemp[7];
-    dtostrf(hic, 6, 2, temperatureTemp);
-    
-    // Uncomment to compute temperature values in Fahrenheit 
-    // float hif = dht.computeHeatIndex(f, h);
-    // static char temperatureTemp[7];
-    // dtostrf(hic, 6, 2, temperatureTemp);
-    
-    static char humidityTemp[7];
-    dtostrf(h, 6, 2, humidityTemp);
+    // initialize LDR sensors array to store read() values
+    float lSensors[2];
+    // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+    for(int i = 0; i < 2; i++){
+      lSensors[i] = analogRead(ldrs[i]);
+    }
 
-    // Publishes Temperature and Humidity values
-    client.publish("room/temperature", temperatureTemp);
-    client.publish("room/humidity", humidityTemp);
+    // initialize MOISTURE sensors array to store read() values
+    float sMoistures[3];
+    // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+    for(int i = 0; i < 3; i++){
+      sMoistures[i] = analogRead(moistures[i]);
+    }
+
+
+    // Convert float temperatures to string
+    static char inTemperature[7];
+    static char outTemperature[7];
+    dtostrf(temperatures[0], 6, 2, inTemperature);
+    dtostrf(temperatures[1], 6, 2, outTemperature);
+    // Convert float humidities to string
+    static char inHumidity[7];
+    static char outHumidity[7];
+    dtostrf(humidities[0], 6, 2, inHumidity);
+    dtostrf(humidities[1], 6, 2, outHumidity);
+
+    // Convert float LDR to string
+    static char inlight[7];
+    static char outlight[7];
+    dtostrf(lSensors[0], 6, 2, inlight);
+    dtostrf(lSensors[1], 6, 2, outlight);
+
+    // Convert float MOISTURE to string
+    static char moisture1[7];
+    static char moisture2[7];
+    static char moisture3[7];
+    dtostrf(sMoistures[0], 6, 2, moisture1);
+    dtostrf(sMoistures[1], 6, 2, moisture2);
+    dtostrf(sMoistures[2], 6, 2, moisture3);
+
+    // Publishes Temperature and Humidity values in string type
+    client.publish("in/temperature", inTemperature);
+    client.publish("in/humidity", inHumidity);
+    client.publish("out/temperature", outTemperature);
+    client.publish("out/humidity", outHumidity);
     
-    Serial.print("Humidity: ");
-    Serial.print(h);
-    Serial.print(" %\t Temperature: ");
-    Serial.print(t);
-    Serial.print(" *C ");
-    Serial.print(f);
-    Serial.print(" *F\t Heat index: ");
-    Serial.print(hic);
+    // Publishes LDR values in string type
+    client.publish("in/light", inlight);
+    // client.publish("out/light", outlight);
+
+    // published MOISTURE value in string type
+    // client.publish("moisture/one", moisture1);
+    // client.publish("moisture/two", moisture2);
+    // client.publish("moisture/three", moisture3);
+    
+    Serial.print("in Humidity: ");
+    Serial.print(temperatures[0]);
+    Serial.print(" %\t in Temperature: ");
+    Serial.print(humidities[0]);
     Serial.println(" *C ");
-    // Serial.print(hif);
-    // Serial.println(" *F");
+    Serial.print("out Humidity: ");
+    Serial.print(temperatures[1]);
+    Serial.print(" %\t out Temperature: ");
+    Serial.print(humidities[1]);
+    Serial.println(" *C ");
+    // LDR sensors
+    Serial.print("in Light: ");
+    Serial.print(inlight);
+    Serial.print(" of 1024\t out Light: ");
+    Serial.print(lSensors[1]);
+    Serial.println(" of 1024 ");
+    // Moisture sensors
+    Serial.print("moisture 1: ");
+    Serial.print(sMoistures[0]);
+    Serial.print(" of 1024\t moisture 2: ");
+    Serial.print(sMoistures[1]);
+    Serial.print(" of 1024\t moisture 3: ");
+    Serial.print(sMoistures[2]);
+    Serial.println(" of 1024 ");
   }
 } 

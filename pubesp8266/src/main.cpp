@@ -14,15 +14,23 @@ const char* mqtt_server = "192.168.43.176";
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-// DHT Sensor - GPIO 5 = D1 on ESP-12E NodeMCU board
+// DHT Sensor - D2&D3 on ESP-12E NodeMCU board
 #define INDHT D2
 #define OUTDHT D3
+// Light Sensor - D0&D1 ESP-12E NodeMCU board
+// TODO: change GPIO TO analog
+#define INTLIGHT D0
+#define OUTLIGHT A0
+// Soil moisture sensors - A2&A3&A3 ESP-12E NodeMCU board
 
 // Initialize DHT sensor. change the line below whatever DHT type you're using DHT11, DHT21 (AM2301), DHT22 (AM2302, AM2321)
 DHT dht[] ={
   {INDHT, DHT11},
   {OUTDHT, DHT11}
 };
+// Initialize LDR sensor
+float ldrs[] = {INTLIGHT, OUTLIGHT};
+// Initialize Soil moisture sensors sensor
 
 // Timers auxiliar variables
 unsigned long now = millis();
@@ -82,11 +90,14 @@ void setup() {
   Serial.begin(115200);
   setup_wifi();
   client.setServer(mqtt_server, 1883);
-
+  // DHTs setup
   for(auto& sensor : dht){
     sensor.begin();
   }
-
+  // LDRs sensor setup
+  for(int i = 0; i < 2; i++){
+    pinMode(ldrs[i], INPUT);
+  }
 }
 
 // For this project, you don't need to change anything in the loop function. Basically it ensures that you ESP is connected to your broker
@@ -111,37 +122,39 @@ void loop() {
       temperatures[i] = dht[i].readTemperature();
     }
 
-    // Check if any reads failed and exit early (to try again).
-    //   if(isnan(humidities[0]) || isnan(temperatures[0])){
-    //     Serial.println("Failed to read from inside DHT sensor!");
-    //     return;
-    //   } 
-    //   if(isnan(humidities[1]) || isnan(temperatures[1])){
-    //     Serial.println("Failed to read from outside DHT sensor!");
-    //     return;
-    //   }
+    // initialize LDR sensors array to store read() values
+    float lSensors[2];
+    // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+    for(int i = 0; i < 2; i++){
+      lSensors[i] = analogRead(ldrs[i]);
+    }
 
-    // Computes temperature values in Celsius
+    // Convert float temperatures to string
     static char inTemperature[7];
     static char outTemperature[7];
     dtostrf(temperatures[0], 6, 2, inTemperature);
     dtostrf(temperatures[1], 6, 2, outTemperature);
-    
-    // Uncomment to compute temperature values in Fahrenheit 
-    // float hif = dht.computeHeatIndex(f, h);
-    // static char temperatureTemp[7];
-    // dtostrf(hic, 6, 2, temperatureTemp);
-    
+    // Convert float humidities to string
     static char inHumidity[7];
     static char outHumidity[7];
     dtostrf(humidities[0], 6, 2, inHumidity);
     dtostrf(humidities[1], 6, 2, outHumidity);
 
-    // Publishes Temperature and Humidity values
+    // Convert float LDR to string
+    static char inlight[7];
+    static char outlight[7];
+    dtostrf(lSensors[0], 6, 2, inlight);
+    dtostrf(lSensors[1], 6, 2, outlight);
+
+    // Publishes Temperature and Humidity values in string type
     client.publish("in/temperature", inTemperature);
     client.publish("in/humidity", inHumidity);
     client.publish("out/temperature", outTemperature);
     client.publish("out/humidity", outHumidity);
+    
+    // Publishes LDR values in string type
+    client.publish("in/light", inlight);
+    client.publish("out/light", outlight);
     
     Serial.print("in Humidity: ");
     Serial.print(temperatures[0]);
@@ -153,5 +166,11 @@ void loop() {
     Serial.print(" %\t out Temperature: ");
     Serial.print(humidities[1]);
     Serial.println(" *C ");
+    // LDR sensors
+    Serial.print("in Light: ");
+    Serial.print(inlight);
+    Serial.print(" of 1024\t out Light: ");
+    Serial.print(outlight);
+    Serial.println(" of 1024 ");
   }
 } 
