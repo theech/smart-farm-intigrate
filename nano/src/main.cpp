@@ -1,0 +1,233 @@
+#include <Arduino.h>
+#include <Keypad.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <SoftwareSerial.h>
+#include <ArduinoJson.h>
+
+#define LDRENVI1 A0
+#define LDRENVI2 A1
+#define MOISTURE1 A2
+#define MOISTURE2 A3
+#define MOISTURE3 A6
+
+// define keypad row and column
+const byte ROWS = 4;
+const byte COLS = 4;
+char hexaKeys[ROWS][COLS] = {
+    {'1', '2', '3', 'A'},
+    {'4', '5', '6', 'B'},
+    {'7', '8', '9', 'C'},
+    {'*', '0', '#', 'D'}};
+byte rowPins[ROWS] = {11, 10, 9, 8};
+byte colPins[COLS] = {7, 6, 5, 4};
+Keypad keypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
+// set the LCD address to 0x27 for a 16 chars and 2 line display
+LiquidCrystal_I2C lcd(0x3F, 16, 4);
+
+// Serial pin that sent to esp8266
+SoftwareSerial espSerial(2, 3);
+
+float ldrs[] = {LDRENVI1, LDRENVI2};
+float moistures[] = {MOISTURE1, MOISTURE2, MOISTURE3};
+
+// initialize LDR sensors array to store read() values
+float ldr[2];
+float moisture[3];
+
+char modecode = '0';
+char password[8];
+char standardcode[6];
+String cridential = "202001";
+
+void setup()
+{
+  Serial.begin(115200);
+  espSerial.begin(115200);
+  // initialize the lcd.
+  lcd.init();
+  lcd.backlight();
+
+  for (int index = 0; index < 2; index++)
+  {
+    pinMode(ldrs[index], INPUT);
+  }
+  for (int index = 0; index < 3; index++)
+  {
+    pinMode(moistures[index], INPUT);
+  }
+
+  delay(2000);
+}
+
+void ldrsEnvi()
+{
+  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+  for (int index = 0; index < 2; index++)
+  {
+    ldr[index] = analogRead(ldrs[index]);
+    ldr[index] = map(ldr[index], 0, 1023, 0, 100);
+  }
+}
+
+void moisturesEnvi()
+{
+  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+  for (int index = 0; index < 3; index++)
+  {
+    moisture[index] = analogRead(moistures[index]);
+    moisture[index] = map(moisture[index], 0, 1023, 100, 0);
+  }
+}
+
+void getkey()
+{
+  char key = keypad.getKey();
+  if (key)
+  {
+    Serial.println(key);
+  }
+
+  // when the user presses 'C' on the keypad, him/ her will guide to the login mode
+  if (key == 'C')
+  {
+    lcd.clear();
+    key = keypad.getKey();
+    lcd.setCursor(5, 0);
+    lcd.print("Login");
+    lcd.setCursor(0, 1);
+    lcd.print("Password:");
+    memset(password, 0, sizeof(password)); // clear lastest password
+    do
+    {
+      key = keypad.getKey();
+      // numbers are allowed to set for password only
+      if (key == '1' || key == '2' || key == '3' || key == '4' || key == '5' || key == '6' || key == '7' || key == '8' || key == '9' || key == '0')
+      {
+        // password length is required only 6 number
+        if (strlen(password) <= 6)
+        {
+          int num = +strlen(password); // extent input from keypad to password valiable
+          password[num] = key;
+          delay(100);
+        }
+        switch (strlen(password) + 8)
+        {
+        case 9:
+          lcd.setCursor(9, 1);
+          lcd.print('*');
+          break;
+        case 10:
+          lcd.setCursor(10, 1);
+          lcd.print('*');
+          break;
+        case 11:
+          lcd.setCursor(11, 1);
+          lcd.print('*');
+          break;
+        case 12:
+          lcd.setCursor(12, 1);
+          lcd.print('*');
+          break;
+        case 13:
+          lcd.setCursor(13, 1);
+          lcd.print('*');
+          break;
+        case 14:
+          lcd.setCursor(14, 1);
+          lcd.print('*');
+          break;
+
+        default:
+          break;
+        }
+        lcd.setCursor(0, 0);
+        lcd.print(strlen(password));
+      }
+    } while (key != 'B');
+    lcd.clear();
+  }
+
+  // convert char to string
+  String passwordStr(password);
+  if (passwordStr == cridential)
+  {
+    lcd.clear();
+    do
+    {
+      key = keypad.getKey();
+      lcd.setCursor(0, 0);
+      lcd.print("auto mode: A");
+      lcd.setCursor(0, 1);
+      lcd.print("manual mode: D");
+      if (key == 'A') // set to automatic mode
+      {
+        lcd.clear();
+        do
+        {
+          modecode = '0';
+          key = keypad.getKey();
+          lcd.setCursor(0, 0);
+          lcd.print("smart farm");
+          lcd.setCursor(0, 1);
+          lcd.print("on auto mode");
+        } while (key != 'B');
+      }
+      else if (key == 'D') // set to manual mode
+      {
+        lcd.clear();
+        do
+        {
+          modecode = '1';
+          key = keypad.getKey();
+          lcd.setCursor(0, 0);
+          lcd.print("smart farm");
+          lcd.setCursor(0, 1);
+          lcd.print("on manual mode");
+        } while (key != 'B');
+      }
+      else if (key == 'C')
+      {
+        lcd.clear();
+        do
+        {
+          key = keypad.getKey();
+          lcd.setCursor(0, 0);
+          lcd.print("smart farm");
+          lcd.setCursor(0, 1);
+          lcd.print("soil number:");
+        } while (key != 'B');
+      }
+    } while (key != 'B');
+    memset(password, 0, sizeof(password)); // clear lastest password
+    lcd.clear();
+  }
+  // TODO put else in do while loop
+  else
+  {
+    Serial.println("login fialed!!");
+  }
+}
+
+void transfer()
+{
+  StaticJsonDocument<500> doc;
+  doc["light1"] = ldr[0];
+  doc["light2"] = ldr[1];
+  doc["moisture1"] = moisture[0];
+  doc["moisture2"] = moisture[1];
+  doc["moisture3"] = moisture[2];
+
+  serializeJson(doc, espSerial);
+}
+
+void loop()
+{
+  getkey();
+  ldrsEnvi();
+  moisturesEnvi();
+  transfer();
+
+  lcd.setCursor(2, 0);
+  lcd.print("Smart farm!!");
+}
