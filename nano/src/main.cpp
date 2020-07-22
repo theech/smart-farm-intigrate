@@ -26,7 +26,7 @@ Keypad keypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
 LiquidCrystal_I2C lcd(0x3F, 16, 4);
 
 // Serial pin that sent to esp8266
-SoftwareSerial espSerial(2, 3);
+SoftwareSerial espSerial(2, 3); // RX, TX
 
 float ldrs[] = {LDRENVI1, LDRENVI2};
 float moistures[] = {MOISTURE1, MOISTURE2, MOISTURE3};
@@ -35,28 +35,29 @@ float moistures[] = {MOISTURE1, MOISTURE2, MOISTURE3};
 float ldr[2];
 float moisture[3];
 
-char modecode = '0';
-char password[8];
-char standardcode[6];
-String cridential = "202001";
+char modecode = '0';                // mode input
+char password[8];             // password input
+char standardcode[6] = "50";         // soil moisture standard number
+String cridential = "202001"; // credentilal privacy
 
 void setup()
 {
   Serial.begin(115200);
-  espSerial.begin(115200);
+  while (!Serial) continue;
+  espSerial.begin(4800);
   // initialize the lcd.
   lcd.init();
   lcd.backlight();
-
+  // input setup of light sensors
   for (int index = 0; index < 2; index++)
   {
     pinMode(ldrs[index], INPUT);
   }
+  // input setup of soil moisture sensors
   for (int index = 0; index < 3; index++)
   {
     pinMode(moistures[index], INPUT);
   }
-
   delay(2000);
 }
 
@@ -105,12 +106,14 @@ void getkey()
       if (key == '1' || key == '2' || key == '3' || key == '4' || key == '5' || key == '6' || key == '7' || key == '8' || key == '9' || key == '0')
       {
         // password length is required only 6 number
-        if (strlen(password) <= 6)
+        if (strlen(password) < 6)
         {
-          int num = +strlen(password); // extent input from keypad to password valiable
+          // extent input from keypad to password valiable
+          int num = +strlen(password);
           password[num] = key;
           delay(100);
         }
+        // print start instead of password as hiden
         switch (strlen(password) + 8)
         {
         case 9:
@@ -150,11 +153,13 @@ void getkey()
 
   // convert char to string
   String passwordStr(password);
+  // login privacy
   if (passwordStr == cridential)
   {
     lcd.clear();
     do
     {
+      // select the system mode
       key = keypad.getKey();
       lcd.setCursor(0, 0);
       lcd.print("auto mode: A");
@@ -167,7 +172,7 @@ void getkey()
         {
           modecode = '0';
           key = keypad.getKey();
-          lcd.setCursor(0, 0);
+          lcd.setCursor(3, 0);
           lcd.print("smart farm");
           lcd.setCursor(0, 1);
           lcd.print("on auto mode");
@@ -180,43 +185,59 @@ void getkey()
         {
           modecode = '1';
           key = keypad.getKey();
-          lcd.setCursor(0, 0);
+          lcd.setCursor(3, 0);
           lcd.print("smart farm");
           lcd.setCursor(0, 1);
           lcd.print("on manual mode");
         } while (key != 'B');
       }
-      else if (key == 'C')
+      else if (key == 'C') // set soil moisture standard number
       {
         lcd.clear();
         do
         {
           key = keypad.getKey();
-          lcd.setCursor(0, 0);
+          lcd.setCursor(3, 0);
           lcd.print("smart farm");
           lcd.setCursor(0, 1);
           lcd.print("soil number:");
+          lcd.setCursor(12, 1);
+          lcd.print(standardcode);
+
+          if (key == '1' || key == '2' || key == '3' || key == '4' || key == '5' || key == '6' || key == '7' || key == '8' || key == '9' || key == '0')
+          {
+            // standardcode length is required only 2 number
+            if (strlen(standardcode) < 2)
+            {
+              // extent input from keypad to standardcode valiable
+              int num = +strlen(standardcode);
+              standardcode[num] = key;
+              delay(100);
+            }
+          }
+          else if (key == '*')
+          {
+            memset(standardcode, 0, strlen(standardcode));
+            lcd.clear();
+          }
         } while (key != 'B');
       }
     } while (key != 'B');
     memset(password, 0, sizeof(password)); // clear lastest password
     lcd.clear();
   }
-  // TODO put else in do while loop
-  else
-  {
-    Serial.println("login fialed!!");
-  }
 }
 
 void transfer()
 {
-  StaticJsonDocument<500> doc;
+  StaticJsonDocument<200> doc;
   doc["light1"] = ldr[0];
   doc["light2"] = ldr[1];
   doc["moisture1"] = moisture[0];
   doc["moisture2"] = moisture[1];
   doc["moisture3"] = moisture[2];
+  doc["modecode"] = modecode;
+  doc["standardcode"] = standardcode;
 
   serializeJson(doc, espSerial);
 }

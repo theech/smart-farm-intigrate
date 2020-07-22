@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <DHT.h>
 #include <ArduinoJson.h>
-#include <SoftwareSerial.h>
 
 #define DHTPIN1 5
 #define DHTPIN2 4
@@ -22,9 +21,11 @@ float moisture[3];
 void setup()
 {
   // Open serial communications and wait for port to open:
-  Serial.begin(4800);
+  Serial.begin(115200);
   while (!Serial)
-    continue;
+  {
+    ; // wait for serial port to connect. Needed for native USB port only
+  }
   // DHTs setup
   for (auto &sensor : dht)
   {
@@ -49,35 +50,22 @@ void receiver()
   if (Serial.available())
   {
     // Create new documents must be bigger than sender because it must store the strings
-    StaticJsonDocument<300> doc;
-    // Read the JSON document from the "link" serial port
+    StaticJsonDocument<400> doc;
     DeserializationError err = deserializeJson(doc, Serial);
 
     if (err == DeserializationError::Ok)
     {
-      // Print the values
-      // (we must use as<T>() to resolve the ambiguity)
-      Serial.print("inside light = ");
-      Serial.print(doc["light1"].as<float>());
-      Serial.print("  outside light = ");
-      Serial.println(doc["light2"].as<float>());
-
-      Serial.print("moisture 1 = ");
-      Serial.print(doc["moisture1"].as<float>());
-      Serial.print("  moisture 2 = ");
-      Serial.print(doc["moisture2"].as<float>());
-      Serial.print("  moisture 3 = ");
-      Serial.println(doc["moisture3"].as<float>());
-
-      Serial.print("mode code = ");
-      Serial.print(doc["modecode"].as<char>());
-      Serial.print("  standard code= ");
-      Serial.println(doc["standardcode"].as<String>());
+      // resive the massage from Arduino
+      ldr[0] == doc["light1"];
+      ldr[1] == doc["light2"];
+      moisture[0] == doc["moisture1"];
+      moisture[1] == doc["moisture2"];
+      moisture[2] == doc["moisture3"];
     }
     else
     {
       // Print error to the "debug" serial port
-      Serial.print("deserializeJson() returned ");
+      Serial.print("deserializeJson() returned: ");
       Serial.println(err.c_str());
 
       // Flush all bytes in the "link" serial port buffer
@@ -89,13 +77,34 @@ void receiver()
 
 void debug()
 {
-  // debug here!!
+  Serial.print("inside humid: ");
+  Serial.print(humids[0]);
+  Serial.print("  intside temp: ");
+  Serial.print(temps[0]);
+  Serial.print("  outside humid: ");
+  Serial.print(humids[1]);
+  Serial.print("  outside temp: ");
+  Serial.println(temps[1]);
+
+  Serial.print("outside light = ");
+  Serial.print(ldr[0]);
+  Serial.print("  outside light = ");
+  Serial.println(ldr[1]);
+
+  // Print the values
+  Serial.print("moisture 1 = ");
+  Serial.print(moisture[0]);
+  Serial.print("  moisture 2= ");
+  Serial.print(moisture[1]);
+  Serial.print("  miosture 3 = ");
+  Serial.println(moisture[2]);
   delay(200);
+
 }
 
 void loop()
 {
   dhtsEnvi();
   receiver();
-  // debug();
+  debug();
 }
