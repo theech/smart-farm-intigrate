@@ -38,7 +38,7 @@ float moisture[3];
 char modecode = '0';                // mode input
 char password[8];             // password input
 char standardcode[6] = "50";         // soil moisture standard number
-String cridential = "******"; // credentilal privacy, set your password here
+String cridential = "202001"; // credentilal privacy, set your password here
 
 void setup()
 {
