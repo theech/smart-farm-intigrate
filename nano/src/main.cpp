@@ -35,10 +35,14 @@ float moistures[] = {MOISTURE1, MOISTURE2, MOISTURE3};
 float ldr[2];
 float moisture[3];
 
-char modecode = '0';                // mode input
+char modecode = 'A';                // mode input
 char password[8];             // password input
 char standardcode[6] = "50";         // soil moisture standard number
 String cridential = "202001"; // credentilal privacy, set your password here
+
+// Timers auxiliar variables
+unsigned long now = millis();
+unsigned long lastMeasure = 0;
 
 void setup()
 {
@@ -170,7 +174,7 @@ void getkey()
         lcd.clear();
         do
         {
-          modecode = '0';
+          modecode = 'A';
           key = keypad.getKey();
           lcd.setCursor(3, 0);
           lcd.print("smart farm");
@@ -183,7 +187,7 @@ void getkey()
         lcd.clear();
         do
         {
-          modecode = '1';
+          modecode = 'M';
           key = keypad.getKey();
           lcd.setCursor(3, 0);
           lcd.print("smart farm");
@@ -233,6 +237,7 @@ void transfer()
   StaticJsonDocument<200> doc;
   doc["light1"] = ldr[0];
   doc["light2"] = ldr[1];
+
   doc["moisture1"] = moisture[0];
   doc["moisture2"] = moisture[1];
   doc["moisture3"] = moisture[2];
@@ -247,7 +252,12 @@ void loop()
   getkey();
   ldrsEnvi();
   moisturesEnvi();
-  transfer();
+
+  now = millis();
+  if (now - lastMeasure > 10000){
+    lastMeasure = now;
+    transfer();
+  }
 
   lcd.setCursor(2, 0);
   lcd.print("Smart farm!!");

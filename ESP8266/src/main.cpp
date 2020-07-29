@@ -14,8 +14,10 @@
 //#define DHTTYPE DHT21 // DHT 21 (AM2301)
 
 // Change the credentials below, so your ESP8266 connects to your router
-const char *ssid = "CEIT-IoT";
-const char *password = "IoT12345678";
+// const char *ssid = "CEIT-IoT";
+// const char *password = "IoT12345678";
+const char *ssid = "CEIT-SOFTWARE";
+const char *password = "ceitSoftw@re2020";
 
 // Change the variable to your Raspberry Pi IP address, so it connects to your MQTT broker
 const char *mqtt_server = "192.168.9.75";
@@ -120,9 +122,14 @@ void dhtsEnvi()
     datahumds.toCharArray(msghumds, datahumds.length());
     datatemps.toCharArray(msgtemps, datatemps.length());
 
-    client.publish("local/humds", msghumds);
-    client.publish("local/temps", msgtemps);
-    delay(100);
+    now = millis();
+    if (now - lastMeasure > 30000)
+    {
+      lastMeasure = now;
+      client.publish("local/humds", msghumds);
+      client.publish("local/temps", msgtemps);
+      delay(100);
+    }
   }
 }
 
@@ -156,18 +163,18 @@ void receiver()
       dtostrf(doc["moisture1"].as<float>(), 4, 2, moisture1);
       dtostrf(doc["moisture2"].as<float>(), 4, 2, moisture2);
       dtostrf(doc["moisture3"].as<float>(), 4, 2, moisture3);
-      dtostrf(doc["modecode"].as<char>(), 4, 2, modecode);
-      dtostrf(doc["standardcode"].as<char>(), 4, 2, standardcode);
+      dtostrf(doc["modecode"].as<char>(), 1, 0, modecode);
+      dtostrf(doc["standardcode"].as<char>(), 2, 0, standardcode);
 
       client.publish("local/light1", light1);
       client.publish("local/light2", light2);
       client.publish("local/moisture1", moisture1);
       client.publish("local/moisture2", moisture2);
       client.publish("local/moisture3", moisture3);
+
       client.publish("local/modecode", modecode);
       client.publish("local/standardcode", standardcode);
-
-      // TODO moisture3 and modecode do not update on the broker
+      //   delay(100);
 
       // Print the values
       // (we must use as<T>() to resolve the ambiguity)
@@ -212,11 +219,6 @@ void loop()
     client.connect("envsensors");
   }
 
-  now = millis();
-  // if (now - lastMeasure > 3000)
-  // {
-  //   lastMeasure = now;
   dhtsEnvi();
   receiver();
-  // }
 }
