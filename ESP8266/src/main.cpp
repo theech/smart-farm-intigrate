@@ -5,19 +5,21 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-#define DHTPIN1 5
-#define DHTPIN2 4
+#define DHTPIN1 5 // D1
+#define DHTPIN2 4 // D2
 
 // Uncomment whatever type you're using!
-#define DHTTYPE DHT11 // DHT 11
-//#define DHTTYPE DHT22 // DHT 22 (AM2302), AM2321
+// #define DHTTYPE DHT11 // DHT 11
+#define DHTTYPE DHT22 // DHT 22 (AM2302), AM2321
 //#define DHTTYPE DHT21 // DHT 21 (AM2301)
 
 // Change the credentials below, so your ESP8266 connects to your router
-// const char *ssid = "CEIT-IoT";
-// const char *password = "IoT12345678";
-const char *ssid = "CEIT-SOFTWARE";
-const char *password = "ceitSoftw@re2020";
+const char *ssid = "CEIT-IoT";
+const char *password = "IoT12345678";
+// const char *ssid = "CEIT-SOFTWARE";
+// const char *password = "ceitSoftw@re2020";
+// const char *ssid = "Smart IoT";
+// const char *password = "iot@2020";
 
 // Change the variable to your Raspberry Pi IP address, so it connects to your MQTT broker
 const char *mqtt_server = "192.168.9.75";
@@ -27,7 +29,7 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 
 // Initialize DHT sensor. change the line below whatever DHT type you're using DHT11, DHT21 (AM2301), DHT22 (AM2302, AM2321)
-DHT dht[] = {{DHTPIN1, DHTTYPE}, {DHTPIN2, DHT11}};
+DHT dht[] = {{DHTPIN1, DHTTYPE}, {DHTPIN2, DHTTYPE}};
 // initialize temperatures and humidities array to store read() values
 float humids[2];
 float temps[2];
@@ -115,19 +117,27 @@ void dhtsEnvi()
     humids[index] = dht[index].readHumidity();
     temps[index] = dht[index].readTemperature();
 
-    String datahumds = (String)humids[0] + "," + (String)humids[1];
-    String datatemps = (String)temps[0] + "," + (String)temps[1];
-    char msghumds[128];
-    char msgtemps[128];
-    datahumds.toCharArray(msghumds, datahumds.length());
-    datatemps.toCharArray(msgtemps, datatemps.length());
+    String humid1 = (String)humids[0];
+    String humid2 = (String)humids[1];
+    String temp1 = (String)temps[0];
+    String temp2 = (String)temps[1];
+    char msghumid1[16];
+    char msghumid2[16];
+    char msgtemp1[16];
+    char msgtemp2[16];
+    humid1.toCharArray(msghumid1, humid1.length());
+    humid2.toCharArray(msghumid2, humid2.length());
+    temp1.toCharArray(msgtemp1, temp1.length());
+    temp2.toCharArray(msgtemp2, temp2.length());
 
     now = millis();
     if (now - lastMeasure > 30000)
     {
       lastMeasure = now;
-      client.publish("local/humds", msghumds);
-      client.publish("local/temps", msgtemps);
+      client.publish("local/humid1", msghumid1);
+      client.publish("local/humid2", msghumid2);
+      client.publish("local/temp1", msgtemp1);
+      client.publish("local/temp2", msgtemp2);
       delay(100);
     }
   }
@@ -155,6 +165,7 @@ void receiver()
       static char moisture1[8];
       static char moisture2[8];
       static char moisture3[8];
+      static char meter[8];
       static char modecode[4];
       static char standardcode[4];
 
@@ -163,6 +174,7 @@ void receiver()
       dtostrf(doc["moisture1"].as<float>(), 4, 2, moisture1);
       dtostrf(doc["moisture2"].as<float>(), 4, 2, moisture2);
       dtostrf(doc["moisture3"].as<float>(), 4, 2, moisture3);
+      dtostrf(doc["meter"].as<long int>(), 2, 0, meter);
       dtostrf(doc["modecode"].as<char>(), 1, 0, modecode);
       dtostrf(doc["standardcode"].as<char>(), 2, 0, standardcode);
 
@@ -171,6 +183,7 @@ void receiver()
       client.publish("local/moisture1", moisture1);
       client.publish("local/moisture2", moisture2);
       client.publish("local/moisture3", moisture3);
+      client.publish("local/meter", meter);
 
       client.publish("local/modecode", modecode);
       client.publish("local/standardcode", standardcode);
@@ -189,6 +202,9 @@ void receiver()
       Serial.print(doc["moisture2"].as<float>());
       Serial.print("  moisture 3 = ");
       Serial.println(doc["moisture3"].as<float>());
+
+      Serial.print("meter: ");
+      Serial.println(doc["meter"].as<long int>());
 
       Serial.print("mode code = ");
       Serial.print(doc["modecode"].as<char>());
