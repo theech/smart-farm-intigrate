@@ -35,7 +35,7 @@ byte colPins[COLS] = {8, 7, 6, 5};
 Keypad keypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
 // set the LCD address to 0x27 for a 16 chars and 2 line display
 // 0x3F for nano
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+LiquidCrystal_I2C lcd(0x3F, 20, 4);
 
 // Serial pin that sent to esp8266
 SoftwareSerial espSerial(3, 4); // TX, RX
@@ -291,32 +291,6 @@ void transfer()
   serializeJson(doc, espSerial);
 }
 
-void monitor()
-{
-  lcd.setCursor(11, 1);
-  lcd.print("in_l:");
-  lcd.print((int)ldr[0]);
-  lcd.setCursor(11, 2);
-  lcd.print("out_l:");
-  lcd.print((int)ldr[1]);
-
-  lcd.setCursor(0, 1);
-  lcd.print("sm1:");
-  lcd.print((int)moisture[0]);
-  lcd.setCursor(0, 2);
-  lcd.print("sm2:");
-  lcd.print((int)moisture[1]);
-  lcd.setCursor(0, 3);
-  lcd.print("sm3:");
-  lcd.print((int)moisture[0]);
-
-  lcd.setCursor(11, 3);
-  lcd.print("mt:");
-  lcd.print(l_min, DEC);
-  lcd.setCursor(16, 3);
-  lcd.print("l/m");
-}
-
 void loop()
 {
   meter();
@@ -329,15 +303,10 @@ void loop()
   {
     lastMeasure = now;
     transfer();
-    monitor();
   }
-
-  if (now - lastMeasure > 5000)
-  {
-    lastMeasure = now;
-    monitor();
-  }
+  Serial.print("light1: ");
+  Serial.println(ldr[0]);
 
   lcd.setCursor(2, 0);
-  lcd.print("smart melon farm");
+  lcd.print("Smart farm!!");
 }
