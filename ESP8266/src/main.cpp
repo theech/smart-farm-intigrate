@@ -14,12 +14,12 @@
 //#define DHTTYPE DHT21 // DHT 21 (AM2301)
 
 // Change the credentials below, so your ESP8266 connects to your router
-const char *ssid = "CEIT-IoT";
-const char *password = "IoT12345678";
+// const char *ssid = "CEIT-IoT";
+// const char *password = "IoT12345678";
 // const char *ssid = "CEIT-SOFTWARE";
 // const char *password = "ceitSoftw@re2020";
-// const char *ssid = "Smart IoT";
-// const char *password = "iot@2020";
+const char *ssid = "Smart IoT";
+const char *password = "iot@2020";
 
 // Change the variable to your Raspberry Pi IP address, so it connects to your MQTT broker
 const char *mqtt_server = "192.168.9.75";
@@ -131,7 +131,7 @@ void dhtsEnvi()
     temp2.toCharArray(msgtemp2, temp2.length());
 
     now = millis();
-    if (now - lastMeasure > 30000)
+    if (now - lastMeasure > 10000)
     {
       lastMeasure = now;
       client.publish("local/humid1", msghumid1);
@@ -234,6 +234,13 @@ void loop()
   {
     client.connect("envsensors");
   }
+
+  //reconncet the mqtt broker if there is lost connection
+  // if (!client.connected())
+  // {
+  //   reconnect();
+  // }
+  // client.loop();
 
   dhtsEnvi();
   receiver();

@@ -26,10 +26,10 @@ unsigned long cloopTime;
 const byte ROWS = 4;
 const byte COLS = 4;
 char hexaKeys[ROWS][COLS] = {
-    {'1', '2', '3', 'A'},
-    {'4', '5', '6', 'B'},
-    {'7', '8', '9', 'C'},
-    {'*', '0', '#', 'D'}};
+    {'1', '4', '7', '*'},
+    {'2', '5', '8', '0'},
+    {'3', '6', '9', '#'},
+    {'A', 'B', 'C', 'D'}};
 byte rowPins[ROWS] = {12, 11, 10, 9};
 byte colPins[COLS] = {8, 7, 6, 5};
 Keypad keypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
@@ -104,8 +104,9 @@ void meter()
   }
   // Serial.print(l_hour, DEC); // Print litres/hour
   // Serial.println(" L/hour");
-  Serial.print(l_min, DEC); // Print litres/hour
-  Serial.println(" L/minute");
+  // Serial.print(l_min, DEC); // Print litres/hour
+  // Serial.print(l_min);
+  // Serial.println(" L/minute");
 }
 
 void ldrsEnvi()
@@ -210,6 +211,8 @@ void getkey()
       lcd.print("auto mode: A");
       lcd.setCursor(0, 1);
       lcd.print("manual mode: D");
+      lcd.setCursor(0, 2);
+      lcd.print("set moisture: C");
       if (key == 'A') // set to automatic mode
       {
         lcd.clear();
@@ -325,11 +328,10 @@ void loop()
   moisturesEnvi();
 
   now = millis();
-  if (now - lastMeasure > 30000)
+  if (now - lastMeasure > 10000)
   {
     lastMeasure = now;
     transfer();
-    monitor();
   }
 
   if (now - lastMeasure > 5000)
@@ -340,4 +342,9 @@ void loop()
 
   lcd.setCursor(2, 0);
   lcd.print("smart melon farm");
+
+
+
+  // Serial.println(ldr[0]);
+  // Serial.println(ldr[1]);
 }
